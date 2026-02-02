@@ -1,28 +1,30 @@
+volumes:
+  ny_taxi_postgres_data:
+    driver: local
+  kestra_postgres_data:
+    driver: local
+  kestra_data:
+    driver: local
+
 services:
   pgdatabase:
     image: postgres:18
-    container_name: pgdatabase
     environment:
       POSTGRES_USER: root
       POSTGRES_PASSWORD: root
       POSTGRES_DB: ny_taxi
-    volumes:
-      - ./ny_taxi_postgres_data:/var/lib/postgresql
     ports:
       - "5432:5432"
+    volumes:
+      - ny_taxi_postgres_data:/var/lib/postgresql
 
   pgadmin:
     image: dpage/pgadmin4
-    container_name: pgadmin
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@admin.com
-      PGADMIN_DEFAULT_PASSWORD: root
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
+      - PGADMIN_DEFAULT_EMAIL=admin@admin.com
+      - PGADMIN_DEFAULT_PASSWORD=root
     ports:
       - "8085:80"
-    depends_on:
-      - pgdatabase
 
   kestra_postgres:
     image: postgres:18
@@ -50,7 +52,11 @@ services:
       - kestra_data:/app/storage
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp/kestra-wd:/tmp/kestra-wd
+      - /home/alanpr/home/data_enginner/02-workflow-orchestration/.secrets:/secrets:ro
+    env_file:
+      - .env
     environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /secrets/my-creds.json
       KESTRA_CONFIGURATION: |
         datasources:
           postgres:
@@ -59,6 +65,11 @@ services:
             username: kestra
             password: k3str4
         kestra:
+          ai:
+            type: gemini
+            gemini:
+              model-name: gemini-2.5-flash
+              api-key: ${GEMINI_API_KEY}
           server:
             basicAuth:
               username: "alan.pr88@gmail.com" # it must be a valid email address
@@ -74,6 +85,10 @@ services:
           tasks:
             tmpDir:
               path: /tmp/kestra-wd/tmp
+            runners:
+              docker:
+                volumes:
+                  - /secrets:/secrets:ro
           url: http://localhost:8080/
     ports:
       - "8080:8080"
@@ -81,11 +96,4 @@ services:
     depends_on:
       kestra_postgres:
         condition: service_started
-
-volumes:
-  pgadmin_data:
-    driver: local
-  kestra_postgres_data:
-    driver: local
-  kestra_data:
-    driver: local
+    
